@@ -1,81 +1,51 @@
 #include <Servo.h>
 
-Servo tester;
+Servo shoulder, elbow, wrist;
+Servo joints[] = {shoulder, elbow, wrist};
 
 const int threshold = 60;
-const int delta = 2;
-const int dd = 50;
-int target = 90;
+const int vel = 2;
+
+int target[] = {90, 90, 90};
+int norm_read[] = {40, 40, 40};
 
 void setup() {
   Serial.begin(57600);
   analogReference(INTERNAL);
-  tester.attach(9);
+  shoulder.attach(9);
+  elbow.attach(10);
+  wrist.attach(11);
 }
 
-int i = 0;
+int last_reads[] = [0, 0, 0];
+boolean cw[] = {true, true, true};
 
-void floop() {
-  tester.write(target - delta);
-  int low = analogRead(3);
-  delay(dd);
-  tester.write(target + delta);
-  int high = analogRead(3);
-  delay(dd);
-  if (low > threshold || high > threshold) {
-    if (low > high) {
-      target = max(0, target - delta);
-    } else {
-      target = min(180, target + delta);
+void joint_step(int j) {
+  int this_read = analogRead(j);
+  if (this_read < norm_read[j] - threshold || norm_read[j] + threshold < this_read) {
+    if (this_read > last_reads[j] + 40) {
+      cw[j] = cw[j] ? false : true;
     }
-  }
-  if (++i >= 1) {
-    i = 0;
-    Serial.print(low);
-    Serial.print("/");
-    Serial.println(high);
-  }
-}
-
-int last_read = 0;
-int last_delta = 5;
-void bloop() {
-  int this_read = analogRead(3);
-  tester.write(target);
-  if (this_read > threshold) {
-    if (this_read - last_read > 50) {
-      last_delta = 0 - last_delta;
-    }
-    target = min(180, max(0, target + last_delta));
-  }
-  last_read = this_read;
-  Serial.print(target);
-  Serial.print(": ");
-  Serial.println(last_read);
-  delay(200);
-}
-
-boolean cw = true;
-int vel = 2;
-
-void loop() {
-  int this_read = analogRead(3);
-  if (this_read > threshold) {
-    //vel = min(vel + 1, 10);
-    if (this_read > last_read + 40) {
-      cw = cw ? false : true;
-      //vel = 1;
-    }
-    if (cw) {
+    int target = target[j];
+    if (cw[j]) {
       target += vel;
     } else {
       target -= vel;
     }
-    last_read = this_read;
-    target = min(180, max(0, target));
-    tester.write(target);
-  } else {
-    //vel = 1;
+    last_reads[j] = this_read;
+    target[j] = min(180, max(0, target));
+    joints[j].write(target[j]);
   }
-  delay(100);
+}
+
+void loop() {
+  shoulder.write(90);
+  elbow.write(90);
+  wrist.write(90);
+  Serial.print(analogRead(0));
+  Serial.print("/");
+  Serial.print(analogRead(1));
+  Serial.print("/");
+  Serial.println(analogRead(2));
+  delay(300);
 }
